@@ -627,6 +627,33 @@ def cmd_gates(ns: argparse.Namespace) -> int:
     return 0 if all_ok else 1
 
 
+def cmd_run(ns: argparse.Namespace) -> int:
+    """
+    argparse handler for `run`:
+    - runs the gate (pre-commit or pre-push)
+    - optionally enforces license check first
+    - prints the FirstTry Gate Summary
+    - returns exit code 0 (pass) or 1 (blocked)
+    """
+    gate = getattr(ns, "gate", None)
+    require_license = bool(getattr(ns, "require_license", False))
+
+    if require_license:
+        # reuse same logic as cli_run in click world
+        current_cli = importlib.import_module("firsttry.cli")
+        ok, _features, _cache = current_cli.assert_license()
+        if not ok:
+            print("License invalid")
+            return 1
+        else:
+            print("License ok")
+            return 0
+
+    text, exit_code = _run_gate_via_runners(gate)
+    print(text, end="")
+    return int(exit_code)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """
     Argparse version of the CLI surface for tests that call build_parser().
@@ -656,6 +683,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail immediately if license is missing/invalid.",
     )
+    run_parser.set_defaults(func=cmd_run)
 
     # install-hooks
     subparsers.add_parser(
